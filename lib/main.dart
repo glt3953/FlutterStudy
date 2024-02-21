@@ -35,6 +35,18 @@ class TextWithUnderline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String testText = '测试换行“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘';
+    // 创建一个 TextPainter 对象
+    TextPainter textPainter = TextPainter(
+      text: TextSpan(text: testText, style: TextStyle(fontSize: 20.0)),
+      maxLines: 999, // 设置最大行数
+      textDirection: TextDirection.ltr,
+    );
+    // 对文本布局进行布局
+    textPainter.layout(maxWidth: 2000);
+    double height = textPainter.height;
+    print('文本高度：$height');
+
     return Text.rich(
       TextSpan(
         style: TextStyle(
@@ -42,7 +54,7 @@ class TextWithUnderline extends StatelessWidget {
           color: Colors.black,
         ),
         // children: _highlightText('“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘'), //“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘
-        children: _highlightTextDemo('测试换行“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘'),
+        children: _highlightTextDemo('测试换行“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘', height),
       ),
     );
    // return DecoratedBox(
@@ -60,7 +72,7 @@ class TextWithUnderline extends StatelessWidget {
 
   /// 文本高亮
   List<InlineSpan> _highlightTextDemo(
-      String content) {
+      String content, double height) {
     List<InlineSpan> spans = [];
 
     for (int i = 0; i < content.length; i++) {
@@ -93,17 +105,10 @@ class TextWithUnderline extends StatelessWidget {
               child:
               Text(text[i], style: TextStyle(fontSize: 20.0),),
               color: const Color(0xFFFF6933),
+              height: height,
             ),
           ));
         }
-
-        // spans.add(WidgetSpan(
-        //   child: Container(
-        //     child:
-        //     Text(content.substring(index, match.start), style: TextStyle(fontSize: 20.0),),
-        //     color: const Color(0xFFFF6933),
-        //   ),
-        // ));
       }
       print('英文：'+match.group(0)!);
       spans.add(WidgetSpan(
@@ -111,17 +116,20 @@ class TextWithUnderline extends StatelessWidget {
           child:
           Text(match.group(0)!, style: TextStyle(fontSize: 20.0),),
           color: const Color(0xFFFF6933),
+          height: height,
         ),
       ));
       index = match.end;
     }
 
     if (index < content.length) {
+      print('中文：'+content.substring(index));
       spans.add(WidgetSpan(
         child: Container(
           child:
           Text(content.substring(index), style: TextStyle(fontSize: 20.0),),
           color: const Color(0xFFFF6933),
+          height: height,
         ),
       ));
     }
