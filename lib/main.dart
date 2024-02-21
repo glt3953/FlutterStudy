@@ -47,7 +47,7 @@ class TextWithUnderline extends StatelessWidget {
           color: Colors.black,
         ),
         // children: _highlightText('“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘'), //“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘
-        children: _highlightTextDemo(testText, fontSize, height),
+        children: _highlightTextDemo(testText, fontSize, height+5),
       ),
     );
    // return DecoratedBox(
@@ -78,8 +78,16 @@ class TextWithUnderline extends StatelessWidget {
   WidgetSpan textWidgetSpan(String text, double fontSize, double height) {
     return WidgetSpan(
       child: Container(
-        child:
-        Text(text, style: TextStyle(fontSize: fontSize),),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              text,
+              style: TextStyle(fontSize: fontSize),
+            ),
+          ],
+        ),
+        // Text(text, style: TextStyle(fontSize: fontSize),),
         color: const Color(0xFFFF6933),
         height: height,
       ),
@@ -117,6 +125,21 @@ class TextWithUnderline extends StatelessWidget {
       text: '\n\n',
     ));
 
+    spans.add(TextSpan(
+      text: '这是一段普通的文本，',
+      style: TextStyle(
+        fontSize: fontSize,
+        height: height/fontSize,
+      ),
+      // children: [
+      //   WidgetSpan(
+      //     alignment: PlaceholderAlignment.middle,
+      //     child: Icon(Icons.star, color: Colors.blue),
+      //   ),
+      //   TextSpan(text: '这是一段普通的文本，'),
+      // ],
+    ));
+
     final RegExp englishWord = RegExp(r'[A-Za-z]+');
     final List<String> segments = content.split(englishWord);
     final Iterable<Match> matches = englishWord.allMatches(content);
@@ -143,6 +166,10 @@ class TextWithUnderline extends StatelessWidget {
       spans.add(textWidgetSpan(content.substring(index), fontSize, height));
       // spans.add(textSpan(content.substring(index)));
     }
+
+    spans.add(TextSpan(
+      text: '再来一段普通的文本，text with underline。',
+    ));
 
     spans.add(TextSpan(
       text: '\n\n',
