@@ -86,6 +86,18 @@ class TextWithUnderline extends StatelessWidget {
     );
   }
 
+  TextSpan textSpan(String text) {
+    return TextSpan(
+      text: text,
+      style: TextStyle(
+          decoration: TextDecoration.underline,
+          decorationColor: const Color(0xFFFF6933),
+          decorationThickness: 1.5,
+          decorationStyle: TextDecorationStyle.solid,
+          color: const Color(0xFF59597C)),
+    );
+  }
+
   /// 文本高亮
   List<InlineSpan> _highlightTextDemo(
       String content, double fontSize, double height) {
@@ -117,17 +129,19 @@ class TextWithUnderline extends StatelessWidget {
         String text = content.substring(index, match.start);
         for (int i = 0; i < text.length; i++) {
           spans.add(textWidgetSpan(text[i], fontSize, height));
+          // spans.add(textSpan(text[i]));
         }
       }
       print('英文：'+match.group(0)!);
       spans.add(textWidgetSpan(match.group(0)!, fontSize, height));
+      // spans.add(textSpan(match.group(0)!));
       index = match.end;
     }
 
     if (index < content.length) {
       print('中文：'+content.substring(index));
-      spans.add(textWidgetSpan(content.substring(index), fontSize, height)
-          );
+      spans.add(textWidgetSpan(content.substring(index), fontSize, height));
+      // spans.add(textSpan(content.substring(index)));
     }
 
     spans.add(TextSpan(
