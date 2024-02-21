@@ -83,12 +83,18 @@ class TextWithUnderline extends StatelessWidget {
           children: [
             Text(
               text,
-              style: TextStyle(fontSize: fontSize),
+              style: TextStyle(
+                  fontSize: fontSize),
             ),
           ],
         ),
         // Text(text, style: TextStyle(fontSize: fontSize),),
         color: const Color(0xFFFF6933),
+        //下划线
+        // decoration: BoxDecoration(
+        //    border: Border(bottom: BorderSide(color: const Color(0xFFFF6933))),
+        //    // color: const Color(0xFFFF6933),
+        // ),
         height: height,
       ),
     );
@@ -183,7 +189,12 @@ class TextWithUnderline extends StatelessWidget {
         spans.add(WidgetSpan(
           child: Container(
             child:
-            Text(content.substring(index, match.start), style: TextStyle(fontSize: 20.0),),
+              Text(
+                content.substring(index, match.start),
+                style: TextStyle(
+                    fontSize: 20.0
+                ),
+              ),
             color: const Color(0xFFFF6933),
           ),
         ));
