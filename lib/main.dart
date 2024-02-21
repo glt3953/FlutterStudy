@@ -77,6 +77,97 @@ class TextWithUnderline extends StatelessWidget {
       text: '\n\n',
     ));
 
+    final RegExp englishWord = RegExp(r'[A-Za-z]+');
+    final List<String> segments = content.split(englishWord);
+    final Iterable<Match> matches = englishWord.allMatches(content);
+
+    //中文按字符输出
+    int index = 0;
+    for (final Match match in matches) {
+      if (match.start > index) {
+        print('中文：'+content.substring(index, match.start));
+        String text = content.substring(index, match.start);
+        for (int i = 0; i < text.length; i++) {
+          spans.add(WidgetSpan(
+            child: Container(
+              child:
+              Text(text[i], style: TextStyle(fontSize: 20.0),),
+              color: const Color(0xFFFF6933),
+            ),
+          ));
+        }
+
+        // spans.add(WidgetSpan(
+        //   child: Container(
+        //     child:
+        //     Text(content.substring(index, match.start), style: TextStyle(fontSize: 20.0),),
+        //     color: const Color(0xFFFF6933),
+        //   ),
+        // ));
+      }
+      print('英文：'+match.group(0)!);
+      spans.add(WidgetSpan(
+        child: Container(
+          child:
+          Text(match.group(0)!, style: TextStyle(fontSize: 20.0),),
+          color: const Color(0xFFFF6933),
+        ),
+      ));
+      index = match.end;
+    }
+
+    if (index < content.length) {
+      spans.add(WidgetSpan(
+        child: Container(
+          child:
+          Text(content.substring(index), style: TextStyle(fontSize: 20.0),),
+          color: const Color(0xFFFF6933),
+        ),
+      ));
+    }
+
+    spans.add(TextSpan(
+      text: '\n\n',
+    ));
+
+    //中文整体输出
+    index = 0;
+    for (final Match match in matches) {
+      if (match.start > index) {
+        print('中文：'+content.substring(index, match.start));
+        spans.add(WidgetSpan(
+          child: Container(
+            child:
+            Text(content.substring(index, match.start), style: TextStyle(fontSize: 20.0),),
+            color: const Color(0xFFFF6933),
+          ),
+        ));
+      }
+      print('英文：'+match.group(0)!);
+      spans.add(WidgetSpan(
+        child: Container(
+          child:
+          Text(match.group(0)!, style: TextStyle(fontSize: 20.0),),
+          color: const Color(0xFFFF6933),
+        ),
+      ));
+      index = match.end;
+    }
+
+    if (index < content.length) {
+      spans.add(WidgetSpan(
+        child: Container(
+          child:
+          Text(content.substring(index), style: TextStyle(fontSize: 20.0),),
+          color: const Color(0xFFFF6933),
+        ),
+      ));
+    }
+
+    spans.add(TextSpan(
+      text: '\n\n',
+    ));
+
     List<String> words = content.split(" ");
     words.forEach((word) {
       spans.add(WidgetSpan(
