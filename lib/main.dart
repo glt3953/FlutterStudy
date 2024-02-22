@@ -71,7 +71,7 @@ class TextWithUnderline extends StatelessWidget {
       textDirection: TextDirection.ltr,
     );
     // 对文本布局进行布局
-    textPainter.layout(2000);
+    textPainter.layout(maxWidth: 2000);
 
     return textPainter.height;
   }
