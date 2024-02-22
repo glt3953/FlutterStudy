@@ -67,11 +67,12 @@ class TextWithUnderline extends StatelessWidget {
     // 创建一个 TextPainter 对象
     TextPainter textPainter = TextPainter(
       text: TextSpan(text: text, style: TextStyle(fontSize: fontSize)),
-      maxLines: 999, // 设置最大行数
+      maxLines: 1, // 设置最大行数
       textDirection: TextDirection.ltr,
     );
     // 对文本布局进行布局
-    textPainter.layout(maxWidth: 2000);
+    textPainter.layout(2000);
+
     return textPainter.height;
   }
 
