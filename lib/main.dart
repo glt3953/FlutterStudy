@@ -76,7 +76,7 @@ class TextWithUnderline extends StatelessWidget {
     return textPainter.height;
   }
 
-  WidgetSpan textWidgetSpan(String text, double fontSize, double height) {
+  WidgetSpan textWidgetSpan(String text, double fontSize, double height, Color styleColor) {
     return WidgetSpan(
       child: Container(
         child: Column(
@@ -90,7 +90,7 @@ class TextWithUnderline extends StatelessWidget {
           ],
         ),
         // Text(text, style: TextStyle(fontSize: fontSize),),
-        color: const Color(0xFFFF6933),
+        color: styleColor,
         //下划线
         // decoration: BoxDecoration(
         //    border: Border(bottom: BorderSide(color: const Color(0xFFFF6933))),
@@ -147,6 +147,13 @@ class TextWithUnderline extends StatelessWidget {
       // ],
     ));
 
+    String text = '这是一段普通的文本，';
+    for (int i = 0; i < text.length; i++) {
+      spans.add(textWidgetSpan(text[i], fontSize, height, Colors.transparent));
+      // spans.add(textSpan(text[i]));
+    }
+    spans.add(textWidgetSpan(text, fontSize, height, Colors.transparent));
+
     final RegExp englishWord = RegExp(r'[A-Za-z]+');
     final List<String> segments = content.split(englishWord);
     final Iterable<Match> matches = englishWord.allMatches(content);
@@ -158,19 +165,19 @@ class TextWithUnderline extends StatelessWidget {
         print('中文：'+content.substring(index, match.start));
         String text = content.substring(index, match.start);
         for (int i = 0; i < text.length; i++) {
-          spans.add(textWidgetSpan(text[i], fontSize, height));
+          spans.add(textWidgetSpan(text[i], fontSize, height, const Color(0xFFFF6933)));
           // spans.add(textSpan(text[i]));
         }
       }
       print('英文：'+match.group(0)!);
-      spans.add(textWidgetSpan(match.group(0)!, fontSize, height));
+      spans.add(textWidgetSpan(match.group(0)!, fontSize, height, const Color(0xFFFF6933)));
       // spans.add(textSpan(match.group(0)!));
       index = match.end;
     }
 
     if (index < content.length) {
       print('中文：'+content.substring(index));
-      spans.add(textWidgetSpan(content.substring(index), fontSize, height));
+      spans.add(textWidgetSpan(content.substring(index), fontSize, height, const Color(0xFFFF6933)));
       // spans.add(textSpan(content.substring(index)));
     }
 
