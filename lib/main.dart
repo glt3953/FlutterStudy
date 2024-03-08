@@ -78,7 +78,10 @@ class TextWithUnderline extends StatelessWidget {
 
   WidgetSpan textWidgetSpan(String text, double fontSize, double height, Color styleColor) {
     return WidgetSpan(
+      alignment: PlaceholderAlignment.middle, //此处必须为middle，配合Container中padding的bottom参数，保持跟TextSpan文字位置一致
+      baseline: TextBaseline.alphabetic,
       child: Container(
+        padding: const EdgeInsets.only(top: 0, bottom: 1),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -90,12 +93,12 @@ class TextWithUnderline extends StatelessWidget {
           ],
         ),
         // Text(text, style: TextStyle(fontSize: fontSize),),
-        color: styleColor,
+        // color: styleColor,
         //下划线
-        // decoration: BoxDecoration(
-        //    border: Border(bottom: BorderSide(color: const Color(0xFFFF6933))),
-        //    // color: const Color(0xFFFF6933),
-        // ),
+        decoration: BoxDecoration(
+           border: Border(bottom: BorderSide(color: const Color(0xFFFF6933))),
+           // color: const Color(0xFFFF6933),
+        ),
         height: height,
       ),
     );
@@ -133,7 +136,7 @@ class TextWithUnderline extends StatelessWidget {
     ));
 
     spans.add(TextSpan(
-      text: '这是一段普通的文本，',
+      text: '普通的文本',
       style: TextStyle(
         fontSize: fontSize,
         height: height/fontSize,
@@ -146,10 +149,27 @@ class TextWithUnderline extends StatelessWidget {
       //   TextSpan(text: '这是一段普通的文本，'),
       // ],
     ));
+    
+    // spans.add(
+    //   WidgetSpan(
+    //     alignment: PlaceholderAlignment.bottom,
+    //     baseline: TextBaseline.alphabetic,
+    //     child: Baseline(
+    //       baseline: 0.0,
+    //       baselineType: TextBaseline.alphabetic,
+    //       child: Text(
+    //         '普通的文本普通的文本普通的文本',
+    //         style: TextStyle(
+    //           fontSize: fontSize,
+    //         ),
+    //       ),
+    //     ),
+    //   ),
+    // );
 
-    String text = '这是一段普通的文本，';
+    String text = '本文2009年';
     for (int i = 0; i < text.length; i++) {
-      spans.add(textWidgetSpan(text[i], fontSize, height, Colors.transparent));
+      spans.add(textWidgetSpan(text[i], fontSize, height, const Color(0xFFFF6933)));
       // spans.add(textSpan(text[i]));
     }
     spans.add(textWidgetSpan(text, fontSize, height, Colors.transparent));
