@@ -1,368 +1,578 @@
+// Copyright 2013 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// ignore_for_file: public_member_api_docs
+
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Underline Demo'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextWithUnderline(
-                text: '这是一段包含中英文混排的文本，This is a text with underline.テスト테스트test테스트テスト',
-              ),
-            ],
-          ),
-        ),
-      ),
+    return const MaterialApp(
+      title: 'Image Picker Demo',
+      home: MyHomePage(title: 'Image Picker Example'),
     );
   }
 }
 
-class TextWithUnderline extends StatelessWidget {
-  final String text;
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, this.title});
 
-  const TextWithUnderline({Key? key, required this.text}) : super(key: key);
+  final String? title;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  List<XFile>? _mediaFileList;
+
+  void _setImageFileListFromFile(XFile? value) {
+    _mediaFileList = value == null ? null : <XFile>[value];
+  }
+
+  dynamic _pickImageError;
+  bool isVideo = false;
+
+  VideoPlayerController? _controller;
+  VideoPlayerController? _toBeDisposed;
+  String? _retrieveDataError;
+
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController maxWidthController = TextEditingController();
+  final TextEditingController maxHeightController = TextEditingController();
+  final TextEditingController qualityController = TextEditingController();
+  final TextEditingController limitController = TextEditingController();
+
+  Future<void> _playVideo(XFile? file) async {
+    if (file != null && mounted) {
+      await _disposeVideoController();
+      late VideoPlayerController controller;
+      if (kIsWeb) {
+        controller = VideoPlayerController.networkUrl(Uri.parse(file.path));
+      } else {
+        controller = VideoPlayerController.file(File(file.path));
+      }
+      _controller = controller;
+      // In web, most browsers won't honor a programmatic call to .play
+      // if the video has a sound track (and is not muted).
+      // Mute the video so it auto-plays in web!
+      // This is not needed if the call to .play is the result of user
+      // interaction (clicking on a "play" button, for example).
+      const double volume = kIsWeb ? 0.0 : 1.0;
+      await controller.setVolume(volume);
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.play();
+      setState(() {});
+    }
+  }
+
+  Future<void> _onImageButtonPressed(
+      ImageSource source, {
+        required BuildContext context,
+        bool isMultiImage = false,
+        bool isMedia = false,
+      }) async {
+    if (_controller != null) {
+      await _controller!.setVolume(0.0);
+    }
+    if (context.mounted) {
+      if (isVideo) {
+        final XFile? file = await _picker.pickVideo(
+            source: source, maxDuration: const Duration(seconds: 10));
+        await _playVideo(file);
+      } else if (isMultiImage) {
+        await _displayPickImageDialog(context, true, (double? maxWidth,
+            double? maxHeight, int? quality, int? limit) async {
+          try {
+            final List<XFile> pickedFileList = isMedia
+                ? await _picker.pickMultipleMedia(
+              maxWidth: maxWidth,
+              maxHeight: maxHeight,
+              imageQuality: quality,
+            )
+                : await _picker.pickMultiImage(
+              maxWidth: maxWidth,
+              maxHeight: maxHeight,
+              imageQuality: quality,
+            );
+            setState(() {
+              _mediaFileList = pickedFileList;
+            });
+          } catch (e) {
+            setState(() {
+              _pickImageError = e;
+            });
+          }
+        });
+      } else if (isMedia) {
+        await _displayPickImageDialog(context, false, (double? maxWidth,
+            double? maxHeight, int? quality, int? limit) async {
+          try {
+            final List<XFile> pickedFileList = <XFile>[];
+            final XFile? media = await _picker.pickMedia(
+              maxWidth: maxWidth,
+              maxHeight: maxHeight,
+              imageQuality: quality,
+            );
+            if (media != null) {
+              pickedFileList.add(media);
+              setState(() {
+                _mediaFileList = pickedFileList;
+              });
+            }
+          } catch (e) {
+            setState(() {
+              _pickImageError = e;
+            });
+          }
+        });
+      } else {
+        await _displayPickImageDialog(context, false, (double? maxWidth,
+            double? maxHeight, int? quality, int? limit) async {
+          try {
+            final XFile? pickedFile = await _picker.pickImage(
+              source: source,
+              maxWidth: maxWidth,
+              maxHeight: maxHeight,
+              imageQuality: quality,
+            );
+            setState(() {
+              _setImageFileListFromFile(pickedFile);
+            });
+          } catch (e) {
+            setState(() {
+              _pickImageError = e;
+            });
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void deactivate() {
+    if (_controller != null) {
+      _controller!.setVolume(0.0);
+      _controller!.pause();
+    }
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _disposeVideoController();
+    maxWidthController.dispose();
+    maxHeightController.dispose();
+    qualityController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _disposeVideoController() async {
+    if (_toBeDisposed != null) {
+      await _toBeDisposed!.dispose();
+    }
+    _toBeDisposed = _controller;
+    _controller = null;
+  }
+
+  Widget _previewVideo() {
+    final Text? retrieveError = _getRetrieveErrorWidget();
+    if (retrieveError != null) {
+      return retrieveError;
+    }
+    if (_controller == null) {
+      return const Text(
+        'You have not yet picked a video',
+        textAlign: TextAlign.center,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: AspectRatioVideo(_controller),
+    );
+  }
+
+  Widget _previewImages() {
+    final Text? retrieveError = _getRetrieveErrorWidget();
+    if (retrieveError != null) {
+      return retrieveError;
+    }
+    if (_mediaFileList != null) {
+      return Semantics(
+        label: 'image_picker_example_picked_images',
+        child: ListView.builder(
+          key: UniqueKey(),
+          itemBuilder: (BuildContext context, int index) {
+            final String? mime = lookupMimeType(_mediaFileList![index].path);
+
+            // Why network for web?
+            // See https://pub.dev/packages/image_picker_for_web#limitations-on-the-web-platform
+            return Semantics(
+              label: 'image_picker_example_picked_image',
+              child: kIsWeb
+                  ? Image.network(_mediaFileList![index].path)
+                  : (mime == null || mime.startsWith('image/')
+                  ? Image.file(
+                File(_mediaFileList![index].path),
+                errorBuilder: (BuildContext context, Object error,
+                    StackTrace? stackTrace) {
+                  return const Center(
+                      child:
+                      Text('This image type is not supported'));
+                },
+              )
+                  : _buildInlineVideoPlayer(index)),
+            );
+          },
+          itemCount: _mediaFileList!.length,
+        ),
+      );
+    } else if (_pickImageError != null) {
+      return Text(
+        'Pick image error: $_pickImageError',
+        textAlign: TextAlign.center,
+      );
+    } else {
+      return const Text(
+        'You have not yet picked an image.',
+        textAlign: TextAlign.center,
+      );
+    }
+  }
+
+  Widget _buildInlineVideoPlayer(int index) {
+    final VideoPlayerController controller =
+    VideoPlayerController.file(File(_mediaFileList![index].path));
+    const double volume = kIsWeb ? 0.0 : 1.0;
+    controller.setVolume(volume);
+    controller.initialize();
+    controller.setLooping(true);
+    controller.play();
+    return Center(child: AspectRatioVideo(controller));
+  }
+
+  Widget _handlePreview() {
+    if (isVideo) {
+      return _previewVideo();
+    } else {
+      return _previewImages();
+    }
+  }
+
+  Future<void> retrieveLostData() async {
+    final LostDataResponse response = await _picker.retrieveLostData();
+    if (response.isEmpty) {
+      return;
+    }
+    if (response.file != null) {
+      if (response.type == RetrieveType.video) {
+        isVideo = true;
+        await _playVideo(response.file);
+      } else {
+        isVideo = false;
+        setState(() {
+          if (response.files == null) {
+            _setImageFileListFromFile(response.file);
+          } else {
+            _mediaFileList = response.files;
+          }
+        });
+      }
+    } else {
+      _retrieveDataError = response.exception!.code;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    String testText = '测试换行“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘'; //'测试换行“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘';
-    double fontSize = 20.0;
-    double height = textHeight(testText, fontSize);
-    print('文本高度：$height');
-
-    return Text.rich(
-      TextSpan(
-        style: TextStyle(
-          fontSize: fontSize,
-          color: Colors.black,
-        ),
-        // children: _highlightText('“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘'), //“中英文”""“”混排，text with underline. ‘テスト테스트test테스트テスト‘
-        children: _highlightTextDemo(testText, fontSize, height+5),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title!),
       ),
-    );
-   // return DecoratedBox(
-   //    decoration: BoxDecoration(
-   //      // border: Border(bottom: BorderSide()),
-   //      color: const Color(0xFFFF6933),
-   //    ),
-   //    child: Text(
-   //      '“中英文”""“”混排，text with underline. テスト테스트test테스트テスト‘',
-   //      style: TextStyle(fontSize: 24.0),
-   //      // selectionColor: const Color(0xFFFF6933),
-   //    ),
-   //  );
-  }
-
-  double textHeight(String text, double fontSize) {
-    // 创建一个 TextPainter 对象
-    TextPainter textPainter = TextPainter(
-      text: TextSpan(text: text, style: TextStyle(fontSize: fontSize)),
-      maxLines: 1, // 设置最大行数
-      textDirection: TextDirection.ltr,
-    );
-    // 对文本布局进行布局
-    textPainter.layout(maxWidth: 2000);
-
-    return textPainter.height;
-  }
-
-  WidgetSpan textWidgetSpan(String text, double fontSize, double height, Color styleColor) {
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle, //此处必须为middle，配合Container中padding的bottom参数，保持跟TextSpan文字位置一致
-      baseline: TextBaseline.alphabetic,
-      child: Container(
-        padding: const EdgeInsets.only(top: 0, bottom: 1),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Text(
-              text,
-              style: TextStyle(
-                  fontSize: fontSize),
+      body: Center(
+        child: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+            ? FutureBuilder<void>(
+          future: retrieveLostData(),
+          builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
+            switch (snapshot.connectionState) {
+              case ConnectionState.none:
+              case ConnectionState.waiting:
+                return const Text(
+                  'You have not yet picked an image.',
+                  textAlign: TextAlign.center,
+                );
+              case ConnectionState.done:
+                return _handlePreview();
+              case ConnectionState.active:
+                if (snapshot.hasError) {
+                  return Text(
+                    'Pick image/video error: ${snapshot.error}}',
+                    textAlign: TextAlign.center,
+                  );
+                } else {
+                  return const Text(
+                    'You have not yet picked an image.',
+                    textAlign: TextAlign.center,
+                  );
+                }
+            }
+          },
+        )
+            : _handlePreview(),
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: <Widget>[
+          Semantics(
+            label: 'image_picker_example_from_gallery',
+            child: FloatingActionButton(
+              onPressed: () {
+                isVideo = false;
+                _onImageButtonPressed(ImageSource.gallery, context: context);
+              },
+              heroTag: 'image0',
+              tooltip: 'Pick Image from gallery',
+              child: const Icon(Icons.photo),
             ),
-          ],
-        ),
-        // Text(text, style: TextStyle(fontSize: fontSize),),
-        // color: styleColor,
-        //下划线
-        decoration: BoxDecoration(
-           border: Border(bottom: BorderSide(color: const Color(0xFFFF6933))),
-           // color: const Color(0xFFFF6933),
-        ),
-        height: height,
-      ),
-    );
-  }
-
-  TextSpan textSpan(String text) {
-    return TextSpan(
-      text: text,
-      style: TextStyle(
-          decoration: TextDecoration.underline,
-          decorationColor: const Color(0xFFFF6933),
-          decorationThickness: 1.5,
-          decorationStyle: TextDecorationStyle.solid,
-          color: const Color(0xFF59597C)),
-    );
-  }
-
-  /// 文本高亮
-  List<InlineSpan> _highlightTextDemo(
-      String content, double fontSize, double height) {
-    List<InlineSpan> spans = [];
-
-    for (int i = 0; i < content.length; i++) {
-      spans.add(WidgetSpan(
-        child: Container(
-          child:
-            Text(content[i], style: TextStyle(fontSize: fontSize),),
-            color: const Color(0xFFFF6933),
-        ),
-      ));
-    }
-
-    spans.add(TextSpan(
-      text: '\n\n',
-    ));
-
-    spans.add(TextSpan(
-      text: '普通的文本',
-      style: TextStyle(
-        fontSize: fontSize,
-        height: height/fontSize,
-      ),
-      // children: [
-      //   WidgetSpan(
-      //     alignment: PlaceholderAlignment.middle,
-      //     child: Icon(Icons.star, color: Colors.blue),
-      //   ),
-      //   TextSpan(text: '这是一段普通的文本，'),
-      // ],
-    ));
-    
-    // spans.add(
-    //   WidgetSpan(
-    //     alignment: PlaceholderAlignment.bottom,
-    //     baseline: TextBaseline.alphabetic,
-    //     child: Baseline(
-    //       baseline: 0.0,
-    //       baselineType: TextBaseline.alphabetic,
-    //       child: Text(
-    //         '普通的文本普通的文本普通的文本',
-    //         style: TextStyle(
-    //           fontSize: fontSize,
-    //         ),
-    //       ),
-    //     ),
-    //   ),
-    // );
-
-    String text = '本文2009年';
-    for (int i = 0; i < text.length; i++) {
-      spans.add(textWidgetSpan(text[i], fontSize, height, const Color(0xFFFF6933)));
-      // spans.add(textSpan(text[i]));
-    }
-    spans.add(textWidgetSpan(text, fontSize, height, Colors.transparent));
-
-    final RegExp englishWord = RegExp(r'[A-Za-z]+');
-    final List<String> segments = content.split(englishWord);
-    final Iterable<Match> matches = englishWord.allMatches(content);
-
-    //中文按字符输出
-    int index = 0;
-    for (final Match match in matches) {
-      if (match.start > index) {
-        print('中文：'+content.substring(index, match.start));
-        String text = content.substring(index, match.start);
-        for (int i = 0; i < text.length; i++) {
-          spans.add(textWidgetSpan(text[i], fontSize, height, const Color(0xFFFF6933)));
-          // spans.add(textSpan(text[i]));
-        }
-      }
-      print('英文：'+match.group(0)!);
-      spans.add(textWidgetSpan(match.group(0)!, fontSize, height, const Color(0xFFFF6933)));
-      // spans.add(textSpan(match.group(0)!));
-      index = match.end;
-    }
-
-    if (index < content.length) {
-      print('中文：'+content.substring(index));
-      spans.add(textWidgetSpan(content.substring(index), fontSize, height, const Color(0xFFFF6933)));
-      // spans.add(textSpan(content.substring(index)));
-    }
-
-    spans.add(TextSpan(
-      text: '再来一段普通的文本，text with underline。',
-    ));
-
-    spans.add(TextSpan(
-      text: '\n\n',
-    ));
-
-    //中文整体输出
-    index = 0;
-    for (final Match match in matches) {
-      if (match.start > index) {
-        print('中文：'+content.substring(index, match.start));
-        spans.add(WidgetSpan(
-          child: Container(
-            child:
-              Text(
-                content.substring(index, match.start),
-                style: TextStyle(
-                    fontSize: 20.0
-                ),
-              ),
-            color: const Color(0xFFFF6933),
           ),
-        ));
-      }
-      print('英文：'+match.group(0)!);
-      spans.add(WidgetSpan(
-        child: Container(
-          child:
-          Text(match.group(0)!, style: TextStyle(fontSize: 20.0),),
-          color: const Color(0xFFFF6933),
-        ),
-      ));
-      index = match.end;
-    }
-
-    if (index < content.length) {
-      spans.add(WidgetSpan(
-        child: Container(
-          child:
-          Text(content.substring(index), style: TextStyle(fontSize: 20.0),),
-          color: const Color(0xFFFF6933),
-        ),
-      ));
-    }
-
-    spans.add(TextSpan(
-      text: '\n\n',
-    ));
-
-    List<String> words = content.split(" ");
-    words.forEach((word) {
-      spans.add(WidgetSpan(
-        child: Container(
-          child:
-          Text(word+" ", style: TextStyle(fontSize: 20.0),),
-          color: const Color(0xFFFF6933),
-        ),
-      ));
-      // for (int i = 0; i < word.length; i++) {
-      //   spans.add(WidgetSpan(
-      //     child: Container(
-      //       child:
-      //       Text(word[i], style: TextStyle(fontSize: 20.0),),
-      //       color: const Color(0xFFFF6933),
-      //     ),
-      //   ));
-      // }
-    });
-
-    spans.add(TextSpan(
-      text: '\n\n',
-    ));
-
-    spans.add(WidgetSpan(
-      child: Container(
-        child:
-          Text(content, style: TextStyle(fontSize: 20.0),),
-          color: const Color(0xFFFF6933),
-      ),
-    ));
-
-    spans.add(TextSpan(
-      text: '\n\n',
-    ));
-
-    spans.add(TextSpan(
-      text: content+'\n\n',
-      style: TextStyle(
-        backgroundColor: const Color(0xFFFF6933),
-      ),
-    ));
-
-    spans.add(TextSpan(
-      text: content+'\n\n',
-      style: TextStyle(
-        color: const Color(0xFFFF6933),
-        fontWeight: FontWeight.bold,
-      ),
-    ));
-
-    spans.add(TextSpan(
-            text: content+'\n\n',
-            style: TextStyle(
-                decoration: TextDecoration.underline,
-                decorationColor: const Color(0xFFFF6933),
-                decorationThickness: 1.5,
-                decorationStyle: TextDecorationStyle.solid,
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              onPressed: () {
+                isVideo = false;
+                _onImageButtonPressed(
+                  ImageSource.gallery,
+                  context: context,
+                  isMultiImage: true,
+                  isMedia: true,
+                );
+              },
+              heroTag: 'multipleMedia',
+              tooltip: 'Pick Multiple Media from gallery',
+              child: const Icon(Icons.photo_library),
             ),
-          ));
-
-    return spans;
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              onPressed: () {
+                isVideo = false;
+                _onImageButtonPressed(
+                  ImageSource.gallery,
+                  context: context,
+                  isMedia: true,
+                );
+              },
+              heroTag: 'media',
+              tooltip: 'Pick Single Media from gallery',
+              child: const Icon(Icons.photo_library),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              onPressed: () {
+                isVideo = false;
+                _onImageButtonPressed(
+                  ImageSource.gallery,
+                  context: context,
+                  isMultiImage: true,
+                );
+              },
+              heroTag: 'image1',
+              tooltip: 'Pick Multiple Image from gallery',
+              child: const Icon(Icons.photo_library),
+            ),
+          ),
+          if (_picker.supportsImageSource(ImageSource.camera))
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: FloatingActionButton(
+                onPressed: () {
+                  isVideo = false;
+                  _onImageButtonPressed(ImageSource.camera, context: context);
+                },
+                heroTag: 'image2',
+                tooltip: 'Take a Photo',
+                child: const Icon(Icons.camera_alt),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: FloatingActionButton(
+              backgroundColor: Colors.red,
+              onPressed: () {
+                isVideo = true;
+                _onImageButtonPressed(ImageSource.gallery, context: context);
+              },
+              heroTag: 'video0',
+              tooltip: 'Pick Video from gallery',
+              child: const Icon(Icons.video_library),
+            ),
+          ),
+          if (_picker.supportsImageSource(ImageSource.camera))
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: FloatingActionButton(
+                backgroundColor: Colors.red,
+                onPressed: () {
+                  isVideo = true;
+                  _onImageButtonPressed(ImageSource.camera, context: context);
+                },
+                heroTag: 'video1',
+                tooltip: 'Take a Video',
+                child: const Icon(Icons.videocam),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
-  /// 文本高亮
-  List<InlineSpan> _highlightText(
-      String content) {
-    List<InlineSpan> spans = [];
+  Text? _getRetrieveErrorWidget() {
+    if (_retrieveDataError != null) {
+      final Text result = Text(_retrieveDataError!);
+      _retrieveDataError = null;
+      return result;
+    }
+    return null;
+  }
 
-    // spans.add(TextSpan(
-    //       text: content,
-    //       style: TextStyle(
-    //           decoration: TextDecoration.underline,
-    //           decorationColor: const Color(0xFFFF6933),
-    //           decorationThickness: 1.5,
-    //           decorationStyle: TextDecorationStyle.solid,
-    //           color: const Color(0xFF59597C)),
-    //     ));
-    spans.add(TextSpan(
-      text: content,
-      style: TextStyle(
-          // backgroundColor: const Color(0xFFFF6933),
-          textBaseline: TextBaseline.alphabetic,
-          decoration: TextDecoration.underline,
-          decorationColor: const Color(0xFFFF6933),
-          decorationThickness: 1.5,
-          decorationStyle: TextDecorationStyle.solid,
-          color: const Color(0xFF59597C)
+  Future<void> _displayPickImageDialog(
+      BuildContext context, bool isMulti, OnPickImageCallback onPick) async {
+    return showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Add optional parameters'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                TextField(
+                  controller: maxWidthController,
+                  keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      hintText: 'Enter maxWidth if desired'),
+                ),
+                TextField(
+                  controller: maxHeightController,
+                  keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      hintText: 'Enter maxHeight if desired'),
+                ),
+                TextField(
+                  controller: qualityController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      hintText: 'Enter quality if desired'),
+                ),
+                if (isMulti)
+                  TextField(
+                    controller: limitController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                        hintText: 'Enter limit if desired'),
+                  ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('CANCEL'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+              TextButton(
+                  child: const Text('PICK'),
+                  onPressed: () {
+                    final double? width = maxWidthController.text.isNotEmpty
+                        ? double.parse(maxWidthController.text)
+                        : null;
+                    final double? height = maxHeightController.text.isNotEmpty
+                        ? double.parse(maxHeightController.text)
+                        : null;
+                    final int? quality = qualityController.text.isNotEmpty
+                        ? int.parse(qualityController.text)
+                        : null;
+                    final int? limit = limitController.text.isNotEmpty
+                        ? int.parse(limitController.text)
+                        : null;
+                    onPick(width, height, quality, limit);
+                    Navigator.of(context).pop();
+                  }),
+            ],
+          );
+        });
+  }
+}
+
+typedef OnPickImageCallback = void Function(
+    double? maxWidth, double? maxHeight, int? quality, int? limit);
+
+class AspectRatioVideo extends StatefulWidget {
+  const AspectRatioVideo(this.controller, {super.key});
+
+  final VideoPlayerController? controller;
+
+  @override
+  AspectRatioVideoState createState() => AspectRatioVideoState();
+}
+
+class AspectRatioVideoState extends State<AspectRatioVideo> {
+  VideoPlayerController? get controller => widget.controller;
+  bool initialized = false;
+
+  void _onVideoControllerUpdate() {
+    if (!mounted) {
+      return;
+    }
+    if (initialized != controller!.value.isInitialized) {
+      initialized = controller!.value.isInitialized;
+      setState(() {});
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    controller!.addListener(_onVideoControllerUpdate);
+  }
+
+  @override
+  void dispose() {
+    controller!.removeListener(_onVideoControllerUpdate);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (initialized) {
+      return Center(
+        child: AspectRatio(
+          aspectRatio: controller!.value.aspectRatio,
+          child: VideoPlayer(controller!),
         ),
-    ));
-
-
-    // String text = "“中英文”""“”混排，text with underline. テスト테스트test테스트テスト‘";
-    //
-    // // 将字符串转换为Unicode编码的文本
-    // List<int> unicodeCodeUnits = text.codeUnits;
-    // print("Unicode编码的文本: $unicodeCodeUnits");
-    //
-    // // 将Unicode码点列表转换回字符串
-    // String decodedText = String.fromCharCodes(unicodeCodeUnits);
-    // print("解码后的文本: $decodedText");
-
-    // String originalString = '“中英文”""“”混排，text with underline. テスト테스트test테스트テスト‘';
-    //
-    // List<int> utf8Bytes = utf8.encode(originalString);
-    // String utf8String = utf8.decode(utf8Bytes);
-    //
-    // print('Original String: $originalString');
-    // print('UTF-8 Bytes: $utf8Bytes');
-    // print('UTF-8 String: $utf8String');
-
-    return spans;
+      );
+    } else {
+      return Container();
+    }
   }
 }
